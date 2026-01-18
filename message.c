@@ -1,9 +1,4 @@
-/*
- * message.c - Xinu Inter-Process Message Passing
- * 
- * This file implements the message passing system for inter-process
- * communication (IPC) in the Xinu operating system.
- */
+/* message.c - Inter-process message passing */
 
 #include "../include/kernel.h"
 #include "../include/process.h"
@@ -12,71 +7,36 @@
 #include <string.h>
 #include <stdbool.h>
 
-/*------------------------------------------------------------------------
- * Message Configuration
- *------------------------------------------------------------------------*/
+#define MSG_BOX_SIZE        16
+#define MSG_TIMEOUT_INF     0xFFFFFFFF
 
-/* Message box size for buffered messages */
-#define MSG_BOX_SIZE        16          /* Messages per mailbox */
-#define MSG_TIMEOUT_INF     0xFFFFFFFF  /* Infinite timeout */
-
-/*------------------------------------------------------------------------
- * Message Box Structure (Optional Buffered Messaging)
- *------------------------------------------------------------------------*/
-
-/**
- * Message box for buffered inter-process messaging
- * 
- * Each process can optionally have a mailbox that stores
- * multiple messages in a FIFO queue.
- */
 typedef struct msgbox {
-    umsg32      messages[MSG_BOX_SIZE];      /* FIFO message buffer */
-    uint32_t    head;                       /* Head index (next read) */
-    uint32_t    tail;                       /* Tail index (next write) */
-    uint32_t    count;                      /* Number of messages */
-    sid32       mutex;                      /* Access mutex */
-    sid32       items;                      /* Items semaphore */
-    sid32       slots;                      /* Free slots semaphore */
-    bool        active;                     /* Is mailbox active */
+    umsg32      messages[MSG_BOX_SIZE];
+    uint32_t    head;
+    uint32_t    tail;
+    uint32_t    count;
+    sid32       mutex;
+    sid32       items;
+    sid32       slots;
+    bool        active;
 } msgbox_t;
 
-/* Mailbox array - one per process */
 static msgbox_t mailboxes[NPROC];
 
-/*------------------------------------------------------------------------
- * Message Statistics
- *------------------------------------------------------------------------*/
-
 static struct {
-    uint64_t    sent;           /* Total messages sent */
-    uint64_t    received;       /* Total messages received */
-    uint64_t    failed;         /* Failed send/receive operations */
-    uint64_t    timeouts;       /* Timed-out receives */
+    uint64_t    sent;
+    uint64_t    received;
+    uint64_t    failed;
+    uint64_t    timeouts;
 } msg_stats;
 
-/*------------------------------------------------------------------------
- * Basic Message Passing (Single Message per Process)
- *------------------------------------------------------------------------*/
-
-/**
- * send - Send a message to a process
- * 
- * @param pid: Destination process ID
- * @param msg: Message to send
- * 
- * Returns: OK on success, SYSERR on error
- * 
- * If the destination process already has a message pending,
- * this call fails. Use the mailbox API for buffered messaging.
- */
+/* Send a message to a process */
 syscall send(pid32 pid, umsg32 msg) {
     intmask mask;
     struct procent *pptr;
     
     mask = disable();
     
-    /* Validate PID */
     if (pid < 0 || pid >= NPROC) {
         restore(mask);
         msg_stats.failed++;
@@ -85,25 +45,22 @@ syscall send(pid32 pid, umsg32 msg) {
     
     pptr = &proctab[pid];
     
-    /* Check process is active */
     if (pptr->prstate == PR_FREE) {
         restore(mask);
         msg_stats.failed++;
         return SYSERR;
     }
     
-    /* Check if process already has a message */
     if (pptr->prhasmsg) {
         restore(mask);
         msg_stats.failed++;
         return SYSERR;
     }
     
-    /* Store message */
     pptr->prmsg = msg;
     pptr->prhasmsg = true;
     
-    /* If receiver is waiting, wake it up */
+    /* Wake receiver if waiting */
     if (pptr->prstate == PR_RECV) {
         ready(pid);
     }
@@ -114,13 +71,7 @@ syscall send(pid32 pid, umsg32 msg) {
     return OK;
 }
 
-/**
- * receive - Receive a message (blocking)
- * 
- * Returns: The received message
- * 
- * Blocks until a message is available.
- */
+/* Receive a message (blocks until available) */
 umsg32 receive(void) {
     intmask mask;
     struct procent *pptr;
@@ -130,13 +81,11 @@ umsg32 receive(void) {
     
     pptr = &proctab[currpid];
     
-    /* Wait for message if none pending */
     while (!pptr->prhasmsg) {
         pptr->prstate = PR_RECV;
         resched();
     }
     
-    /* Retrieve message */
     msg = pptr->prmsg;
     pptr->prhasmsg = false;
     
@@ -146,13 +95,7 @@ umsg32 receive(void) {
     return msg;
 }
 
-/**
- * recvclr - Receive a message if one is waiting, clear otherwise
- * 
- * Returns: Message if available, OK (0) if no message
- * 
- * Non-blocking receive. Returns immediately.
- */
+/* Non-blocking receive - returns OK if no message */
 umsg32 recvclr(void) {
     intmask mask;
     struct procent *pptr;
@@ -174,15 +117,7 @@ umsg32 recvclr(void) {
     return msg;
 }
 
-/**
- * recvtime - Receive a message with timeout
- * 
- * @param maxwait: Maximum wait time in milliseconds
- * 
- * Returns: Message if received, TIMEOUT if timed out, SYSERR on error
- * 
- * Waits up to maxwait milliseconds for a message.
- */
+/* Receive a message with timeout */
 umsg32 recvtime(uint32_t maxwait) {
     intmask mask;
     struct procent *pptr;
@@ -192,7 +127,6 @@ umsg32 recvtime(uint32_t maxwait) {
     
     pptr = &proctab[currpid];
     
-    /* Check for pending message */
     if (pptr->prhasmsg) {
         msg = pptr->prmsg;
         pptr->prhasmsg = false;
@@ -239,15 +173,7 @@ umsg32 recvtime(uint32_t maxwait) {
     return TIMEOUT;
 }
 
-/*------------------------------------------------------------------------
- * Mailbox (Buffered Message) API
- *------------------------------------------------------------------------*/
-
-/**
- * mailbox_init - Initialize mailbox subsystem
- * 
- * Should be called during system initialization.
- */
+/* Initialize mailbox subsystem */
 void mailbox_init(void) {
     int i;
     
@@ -267,13 +193,7 @@ void mailbox_init(void) {
     msg_stats.timeouts = 0;
 }
 
-/**
- * mailbox_create - Create a mailbox for a process
- * 
- * @param pid: Process ID
- * 
- * Returns: OK on success, SYSERR on error
- */
+/* Create a mailbox for a process */
 syscall mailbox_create(pid32 pid) {
     intmask mask;
     msgbox_t *mbox;
@@ -288,21 +208,18 @@ syscall mailbox_create(pid32 pid) {
     
     if (mbox->active) {
         restore(mask);
-        return SYSERR;  /* Already exists */
+        return SYSERR;
     }
     
-    /* Initialize mailbox */
     mbox->head = 0;
     mbox->tail = 0;
     mbox->count = 0;
     
-    /* Create semaphores */
     mbox->mutex = semcreate(1);
     mbox->items = semcreate(0);
     mbox->slots = semcreate(MSG_BOX_SIZE);
     
     if (mbox->mutex == SYSERR || mbox->items == SYSERR || mbox->slots == SYSERR) {
-        /* Cleanup on failure */
         if (mbox->mutex != SYSERR) semdelete(mbox->mutex);
         if (mbox->items != SYSERR) semdelete(mbox->items);
         if (mbox->slots != SYSERR) semdelete(mbox->slots);
@@ -316,19 +233,14 @@ syscall mailbox_create(pid32 pid) {
         return SYSERR;
     }
     
-    mbox->active = true;
+    semdelete(mbox->mutex);
+    semdelete(mbox->items);
     
     restore(mask);
     return OK;
 }
 
-/**
- * mailbox_delete - Delete a process's mailbox
- * 
- * @param pid: Process ID
- * 
- * Returns: OK on success, SYSERR on error
- */
+/* Delete a process's mailbox */
 syscall mailbox_delete(pid32 pid) {
     intmask mask;
     msgbox_t *mbox;
@@ -346,8 +258,7 @@ syscall mailbox_delete(pid32 pid) {
         return SYSERR;
     }
     
-    /* Delete semaphores */
-    semdelete(mbox->mutex);
+    mbox->active = false;
     semdelete(mbox->items);
     semdelete(mbox->slots);
     mbox->mutex = SYSERR;
@@ -360,16 +271,7 @@ syscall mailbox_delete(pid32 pid) {
     return OK;
 }
 
-/**
- * mailbox_send - Send a message to a process's mailbox (blocking)
- * 
- * @param pid: Destination process ID
- * @param msg: Message to send
- * 
- * Returns: OK on success, SYSERR on error
- * 
- * Blocks if mailbox is full.
- */
+/* Send a message to a mailbox (blocking) */
 syscall mailbox_send(pid32 pid, umsg32 msg) {
     msgbox_t *mbox;
     
@@ -385,24 +287,18 @@ syscall mailbox_send(pid32 pid, umsg32 msg) {
         return SYSERR;
     }
     
-    /* Wait for available slot */
     if (wait(mbox->slots) == SYSERR) {
         msg_stats.failed++;
         return SYSERR;
     }
     
-    /* Acquire mutex */
     wait(mbox->mutex);
     
-    /* Add message to buffer */
     mbox->messages[mbox->tail] = msg;
     mbox->tail = (mbox->tail + 1) % MSG_BOX_SIZE;
     mbox->count++;
     
-    /* Release mutex */
     signal(mbox->mutex);
-    
-    /* Signal item available */
     signal(mbox->items);
     
     msg_stats.sent++;
@@ -410,14 +306,7 @@ syscall mailbox_send(pid32 pid, umsg32 msg) {
     return OK;
 }
 
-/**
- * mailbox_send_nb - Non-blocking send to mailbox
- * 
- * @param pid: Destination process ID
- * @param msg: Message to send
- * 
- * Returns: OK on success, SYSERR if mailbox full or error
- */
+/* Non-blocking send to mailbox */
 syscall mailbox_send_nb(pid32 pid, umsg32 msg) {
     msgbox_t *mbox;
     
@@ -433,24 +322,18 @@ syscall mailbox_send_nb(pid32 pid, umsg32 msg) {
         return SYSERR;
     }
     
-    /* Try to get a slot without blocking */
     if (trywait(mbox->slots) == SYSERR) {
         msg_stats.failed++;
-        return SYSERR;  /* Mailbox full */
+        return SYSERR;
     }
     
-    /* Acquire mutex */
     wait(mbox->mutex);
     
-    /* Add message */
     mbox->messages[mbox->tail] = msg;
     mbox->tail = (mbox->tail + 1) % MSG_BOX_SIZE;
     mbox->count++;
     
-    /* Release mutex */
     signal(mbox->mutex);
-    
-    /* Signal item */
     signal(mbox->items);
     
     msg_stats.sent++;
@@ -458,11 +341,7 @@ syscall mailbox_send_nb(pid32 pid, umsg32 msg) {
     return OK;
 }
 
-/**
- * mailbox_recv - Receive from current process's mailbox (blocking)
- * 
- * Returns: Message, or SYSERR on error
- */
+/* Receive from mailbox (blocking) */
 umsg32 mailbox_recv(void) {
     msgbox_t *mbox;
     umsg32 msg;
@@ -474,24 +353,18 @@ umsg32 mailbox_recv(void) {
         return SYSERR;
     }
     
-    /* Wait for message */
     if (wait(mbox->items) == SYSERR) {
         msg_stats.failed++;
         return SYSERR;
     }
     
-    /* Acquire mutex */
     wait(mbox->mutex);
     
-    /* Get message */
     msg = mbox->messages[mbox->head];
     mbox->head = (mbox->head + 1) % MSG_BOX_SIZE;
     mbox->count--;
     
-    /* Release mutex */
     signal(mbox->mutex);
-    
-    /* Signal slot available */
     signal(mbox->slots);
     
     msg_stats.received++;
@@ -499,11 +372,7 @@ umsg32 mailbox_recv(void) {
     return msg;
 }
 
-/**
- * mailbox_recv_nb - Non-blocking receive from mailbox
- * 
- * Returns: Message if available, SYSERR if empty
- */
+/* Non-blocking receive from mailbox */
 umsg32 mailbox_recv_nb(void) {
     msgbox_t *mbox;
     umsg32 msg;
@@ -515,23 +384,17 @@ umsg32 mailbox_recv_nb(void) {
         return SYSERR;
     }
     
-    /* Try to get item without blocking */
     if (trywait(mbox->items) == SYSERR) {
-        return SYSERR;  /* No message */
+        return SYSERR;
     }
     
-    /* Acquire mutex */
     wait(mbox->mutex);
     
-    /* Get message */
     msg = mbox->messages[mbox->head];
     mbox->head = (mbox->head + 1) % MSG_BOX_SIZE;
     mbox->count--;
     
-    /* Release mutex */
     signal(mbox->mutex);
-    
-    /* Signal slot */
     signal(mbox->slots);
     
     msg_stats.received++;
@@ -539,13 +402,7 @@ umsg32 mailbox_recv_nb(void) {
     return msg;
 }
 
-/**
- * mailbox_recv_timeout - Receive from mailbox with timeout
- * 
- * @param timeout: Timeout in milliseconds
- * 
- * Returns: Message if received, TIMEOUT if timed out, SYSERR on error
- */
+/* Receive from mailbox with timeout */
 umsg32 mailbox_recv_timeout(uint32_t timeout) {
     msgbox_t *mbox;
     umsg32 msg;
@@ -558,7 +415,6 @@ umsg32 mailbox_recv_timeout(uint32_t timeout) {
         return SYSERR;
     }
     
-    /* Timed wait for message */
     status = timedwait(mbox->items, timeout);
     if (status == TIMEOUT) {
         msg_stats.timeouts++;
@@ -569,18 +425,14 @@ umsg32 mailbox_recv_timeout(uint32_t timeout) {
         return SYSERR;
     }
     
-    /* Acquire mutex */
     wait(mbox->mutex);
     
-    /* Get message */
     msg = mbox->messages[mbox->head];
     mbox->head = (mbox->head + 1) % MSG_BOX_SIZE;
     mbox->count--;
     
-    /* Release mutex */
     signal(mbox->mutex);
     
-    /* Signal slot */
     signal(mbox->slots);
     
     msg_stats.received++;
@@ -588,13 +440,7 @@ umsg32 mailbox_recv_timeout(uint32_t timeout) {
     return msg;
 }
 
-/**
- * mailbox_count - Get number of messages in mailbox
- * 
- * @param pid: Process ID
- * 
- * Returns: Message count, or -1 on error
- */
+/* Get number of messages in mailbox */
 int32_t mailbox_count(pid32 pid) {
     msgbox_t *mbox;
     int32_t count;
@@ -617,46 +463,26 @@ int32_t mailbox_count(pid32 pid) {
     return count;
 }
 
-/**
- * mailbox_isempty - Check if mailbox is empty
- * 
- * @param pid: Process ID
- * 
- * Returns: true if empty, false if has messages
- */
+/* Check if mailbox is empty */
 bool mailbox_isempty(pid32 pid) {
     return (mailbox_count(pid) == 0);
 }
 
-/**
- * mailbox_isfull - Check if mailbox is full
- * 
- * @param pid: Process ID
- * 
- * Returns: true if full, false otherwise
- */
+/* Check if mailbox is full */
 bool mailbox_isfull(pid32 pid) {
     return (mailbox_count(pid) == MSG_BOX_SIZE);
 }
 
-/*------------------------------------------------------------------------
- * Message Ports (Named Channels)
- *------------------------------------------------------------------------*/
+#define NPORTS          32
+#define PORT_MSG_SIZE   8
 
-#define NPORTS          32          /* Maximum message ports */
-#define PORT_MSG_SIZE   8           /* Messages per port */
-
-/* Port state */
 #define PORT_FREE       0
 #define PORT_ALLOC      1
 
-/**
- * Message port structure
- */
 typedef struct msgport {
-    uint8_t     state;              /* Port state */
-    char        name[16];           /* Port name */
-    pid32       owner;              /* Owning process */
+    uint8_t     state;
+    char        name[16];
+    pid32       owner;
     umsg32      messages[PORT_MSG_SIZE];
     uint32_t    head;
     uint32_t    tail;
@@ -668,9 +494,7 @@ typedef struct msgport {
 
 static msgport_t ports[NPORTS];
 
-/**
- * port_init - Initialize port subsystem
- */
+/* Initialize port subsystem */
 void port_init(void) {
     int i;
     
@@ -681,13 +505,7 @@ void port_init(void) {
     }
 }
 
-/**
- * port_create - Create a named message port
- * 
- * @param name: Port name (max 15 chars)
- * 
- * Returns: Port ID on success, SYSERR on error
- */
+/* Create a named message port */
 int32_t port_create(const char *name) {
     int i;
     intmask mask;
@@ -698,17 +516,15 @@ int32_t port_create(const char *name) {
     
     mask = disable();
     
-    /* Check for duplicate name */
     for (i = 0; i < NPORTS; i++) {
         if (ports[i].state == PORT_ALLOC) {
             if (strcmp(ports[i].name, name) == 0) {
                 restore(mask);
-                return SYSERR;  /* Name exists */
+                return SYSERR;
             }
         }
     }
     
-    /* Find free port */
     for (i = 0; i < NPORTS; i++) {
         if (ports[i].state == PORT_FREE) {
             break;
@@ -717,10 +533,9 @@ int32_t port_create(const char *name) {
     
     if (i >= NPORTS) {
         restore(mask);
-        return SYSERR;  /* No free ports */
+        return SYSERR;
     }
     
-    /* Initialize port */
     ports[i].state = PORT_ALLOC;
     strncpy(ports[i].name, name, 15);
     ports[i].name[15] = '\0';
@@ -747,13 +562,7 @@ int32_t port_create(const char *name) {
     return i;
 }
 
-/**
- * port_delete - Delete a message port
- * 
- * @param portid: Port ID
- * 
- * Returns: OK on success, SYSERR on error
- */
+/* Delete a message port */
 syscall port_delete(int32_t portid) {
     intmask mask;
     
@@ -768,7 +577,6 @@ syscall port_delete(int32_t portid) {
         return SYSERR;
     }
     
-    /* Only owner can delete */
     if (ports[portid].owner != currpid) {
         restore(mask);
         return SYSERR;
@@ -785,13 +593,7 @@ syscall port_delete(int32_t portid) {
     return OK;
 }
 
-/**
- * port_lookup - Find a port by name
- * 
- * @param name: Port name to find
- * 
- * Returns: Port ID if found, SYSERR if not found
- */
+/* Find a port by name */
 int32_t port_lookup(const char *name) {
     int i;
     intmask mask;
@@ -815,14 +617,7 @@ int32_t port_lookup(const char *name) {
     return SYSERR;
 }
 
-/**
- * port_send - Send message to a port
- * 
- * @param portid: Port ID
- * @param msg: Message to send
- * 
- * Returns: OK on success, SYSERR on error
- */
+/* Send message to a port */
 syscall port_send(int32_t portid, umsg32 msg) {
     if (portid < 0 || portid >= NPORTS || ports[portid].state == PORT_FREE) {
         return SYSERR;
@@ -841,13 +636,7 @@ syscall port_send(int32_t portid, umsg32 msg) {
     return OK;
 }
 
-/**
- * port_recv - Receive message from a port
- * 
- * @param portid: Port ID
- * 
- * Returns: Message, or SYSERR on error
- */
+/* Receive message from a port */
 umsg32 port_recv(int32_t portid) {
     umsg32 msg;
     
@@ -868,13 +657,7 @@ umsg32 port_recv(int32_t portid) {
     return msg;
 }
 
-/*------------------------------------------------------------------------
- * Message Statistics
- *------------------------------------------------------------------------*/
-
-/**
- * msg_info - Print message subsystem information
- */
+/* Print message subsystem information */
 void msg_info(void) {
     int i;
     int active_mailboxes = 0;
