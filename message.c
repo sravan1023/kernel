@@ -31,7 +31,7 @@
  * multiple messages in a FIFO queue.
  */
 typedef struct msgbox {
-    umsg32      messages[MSG_BOX_SIZE];     /* Message buffer */
+    umsg32      messages[MSG_BOX_SIZE];      /* FIFO message buffer */
     uint32_t    head;                       /* Head index (next read) */
     uint32_t    tail;                       /* Tail index (next write) */
     uint32_t    count;                      /* Number of messages */
