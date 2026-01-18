@@ -255,9 +255,9 @@ void mailbox_init(void) {
         mailboxes[i].head = 0;
         mailboxes[i].tail = 0;
         mailboxes[i].count = 0;
-        mailboxes[i].mutex = -1;
-        mailboxes[i].items = -1;
-        mailboxes[i].slots = -1;
+        mailboxes[i].mutex = SYSERR;
+        mailboxes[i].items = SYSERR;
+        mailboxes[i].slots = SYSERR;
         mailboxes[i].active = false;
     }
     
@@ -306,6 +306,12 @@ syscall mailbox_create(pid32 pid) {
         if (mbox->mutex != SYSERR) semdelete(mbox->mutex);
         if (mbox->items != SYSERR) semdelete(mbox->items);
         if (mbox->slots != SYSERR) semdelete(mbox->slots);
+        mbox->mutex = SYSERR;
+        mbox->items = SYSERR;
+        mbox->slots = SYSERR;
+        mbox->head = 0;
+        mbox->tail = 0;
+        mbox->count = 0;
         restore(mask);
         return SYSERR;
     }
@@ -344,6 +350,9 @@ syscall mailbox_delete(pid32 pid) {
     semdelete(mbox->mutex);
     semdelete(mbox->items);
     semdelete(mbox->slots);
+    mbox->mutex = SYSERR;
+    mbox->items = SYSERR;
+    mbox->slots = SYSERR;
     
     mbox->active = false;
     
