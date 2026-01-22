@@ -2,7 +2,6 @@
 
 #include "../include/interrupts.h"
 #include "../include/kernel.h"
-
 #include <string.h>
 #include <stdbool.h>
 
@@ -73,10 +72,13 @@ static const char *exception_names[MAX_EXCEPTIONS] = {
 intmask disable(void) {
     intmask old_state = interrupt_state;
     
+    interrupt_depth++;
     interrupt_state = 1;
     
     if (int_stack_ptr < INT_STACK_SIZE) {
         int_state_stack[int_stack_ptr++] = old_state;
+    } else {
+        panic("Interrupt stack overflow");
     }
     
     return old_state;
@@ -84,10 +86,16 @@ intmask disable(void) {
 
 /* Restore interrupt state */
 void restore(intmask mask) {
-    interrupt_state = mask;
-    
+    if (interrupt_depth > 0) {
+        interrupt_depth--;
+    } else {
+        /* Underflow: restore called too many times */
+    }
+
     if (int_stack_ptr > 0) {
-        int_stack_ptr--;
+        interrupt_state = int_state_stack[--int_stack_ptr];
+    } else {
+        interrupt_state = mask;
     }
 }
 
