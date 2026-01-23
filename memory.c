@@ -1,9 +1,4 @@
-/*
- * memory.c - Xinu Kernel Memory Management
- * 
- * This file implements kernel memory allocation and management
- * functions including heap allocation and stack management.
- */
+/* memory.c - Memory management implementation */
 
 #include "../include/kernel.h"
 #include "../include/memory.h"
@@ -13,78 +8,52 @@
 #include <string.h>
 #include <stdbool.h>
 
-/*------------------------------------------------------------------------
- * Memory Configuration
- *------------------------------------------------------------------------*/
+extern char _heap_start;
+extern char _heap_end;
+extern char _stack_start;
+extern char _stack_end;
 
-/* Memory regions - platform specific, typically set by linker script */
-extern char _heap_start;    /* Start of heap (from linker) */
-extern char _heap_end;      /* End of heap (from linker) */
-extern char _stack_start;   /* Start of stack region */
-extern char _stack_end;     /* End of stack region */
-
-/* If linker symbols not available, use static allocation */
 #ifndef __LINKER_DEFINED_HEAP__
-#define HEAP_SIZE       (64 * 1024)     /* 64KB heap */
-#define STACK_SIZE      (32 * 1024)     /* 32KB stack pool */
+#define HEAP_SIZE       (64 * 1024)
+#define STACK_SIZE      (32 * 1024)
 static char heap_memory[HEAP_SIZE] __attribute__((aligned(8)));
 static char stack_memory[STACK_SIZE] __attribute__((aligned(8)));
 #endif
 
-/* Memory block header */
 typedef struct memblk {
-    struct memblk   *mnext;     /* Pointer to next free block */
-    uint32_t        mlength;    /* Size of this block (including header) */
+    struct memblk   *mnext;
+    uint32_t        mlength;
 } memblk_t;
 
-/* Memory list (free list) */
 static struct {
-    memblk_t    *mhead;         /* Head of free list */
-    uint32_t    mfree;          /* Total free memory */
-    uint32_t    mtotal;         /* Total heap size */
-    uint32_t    mallocs;        /* Number of allocations */
-    uint32_t    frees;          /* Number of frees */
+    memblk_t    *mhead;
+    uint32_t    mfree;
+    uint32_t    mtotal;
+    uint32_t    mallocs;
+    uint32_t    frees;
 } memlist;
 
-/* Stack allocation list */
 static struct {
-    memblk_t    *mhead;         /* Head of free stack list */
-    uint32_t    mfree;          /* Total free stack memory */
-    uint32_t    mtotal;         /* Total stack pool size */
+    memblk_t    *mhead;
+    uint32_t    mfree;
+    uint32_t    mtotal;
 } stkpool;
 
-/* Minimum block size (header + 8 bytes usable) */
 #define MIN_BLOCK_SIZE  (sizeof(memblk_t) + 8)
-
-/* Round up to alignment boundary */
 #define ROUNDUP(x, align)   (((x) + (align) - 1) & ~((align) - 1))
 #define ROUNDDOWN(x, align) ((x) & ~((align) - 1))
 #define MEM_ALIGNMENT       8
 
-/*------------------------------------------------------------------------
- * Memory Initialization
- *------------------------------------------------------------------------*/
-
-/**
- * meminit - Initialize the memory subsystem
- * 
- * @param heapstart: Start address of heap memory
- * @param heapend: End address of heap memory
- * 
- * Returns: OK on success, SYSERR on error
- * 
- * Sets up the free list for heap allocation.
- */
+/* Initialize heap */
+/* Initialize heap */
 syscall meminit(void *heapstart, void *heapend) {
     memblk_t *block;
     uint32_t heapsize;
     
-    /* Validate parameters */
     if (heapstart == NULL || heapend == NULL || heapstart >= heapend) {
         return SYSERR;
     }
     
-    /* Align start up and end down */
     heapstart = (void *)ROUNDUP((uintptr_t)heapstart, MEM_ALIGNMENT);
     heapend = (void *)ROUNDDOWN((uintptr_t)heapend, MEM_ALIGNMENT);
     
@@ -94,7 +63,6 @@ syscall meminit(void *heapstart, void *heapend) {
         return SYSERR;
     }
     
-    /* Initialize free list with single block */
     block = (memblk_t *)heapstart;
     block->mnext = NULL;
     block->mlength = heapsize;
@@ -108,14 +76,7 @@ syscall meminit(void *heapstart, void *heapend) {
     return OK;
 }
 
-/**
- * stkinit - Initialize the stack pool
- * 
- * @param stkstart: Start address of stack pool
- * @param stkend: End address of stack pool
- * 
- * Returns: OK on success, SYSERR on error
- */
+/* Initialize stack pool */
 syscall stkinit(void *stkstart, void *stkend) {
     memblk_t *block;
     uint32_t stksize;
@@ -144,12 +105,7 @@ syscall stkinit(void *stkstart, void *stkend) {
     return OK;
 }
 
-/**
- * mem_init_default - Initialize memory with default regions
- * 
- * Uses statically allocated memory regions if linker symbols
- * are not available.
- */
+/* Initialize with default memory regions */
 void mem_init_default(void) {
 #ifndef __LINKER_DEFINED_HEAP__
     meminit(heap_memory, heap_memory + HEAP_SIZE);
@@ -160,19 +116,7 @@ void mem_init_default(void) {
 #endif
 }
 
-/*------------------------------------------------------------------------
- * Heap Memory Allocation
- *------------------------------------------------------------------------*/
-
-/**
- * getmem - Allocate heap memory
- * 
- * @param nbytes: Number of bytes to allocate
- * 
- * Returns: Pointer to allocated memory, or (void *)SYSERR on error
- * 
- * Uses first-fit allocation strategy.
- */
+/* Allocate heap memory (first-fit) */
 void *getmem(uint32_t nbytes) {
     intmask mask;
     memblk_t *prev, *curr, *leftover;
@@ -182,21 +126,16 @@ void *getmem(uint32_t nbytes) {
         return (void *)SYSERR;
     }
     
-    /* Round up to include header and alignment */
     length = ROUNDUP(nbytes + sizeof(memblk_t), MEM_ALIGNMENT);
     
     mask = disable();
     
-    /* First-fit search */
     prev = NULL;
     curr = memlist.mhead;
     
     while (curr != NULL) {
         if (curr->mlength >= length) {
-            /* Found a suitable block */
-            
             if (curr->mlength >= length + MIN_BLOCK_SIZE) {
-                /* Split the block */
                 leftover = (memblk_t *)((char *)curr + length);
                 leftover->mnext = curr->mnext;
                 leftover->mlength = curr->mlength - length;

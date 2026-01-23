@@ -1,10 +1,4 @@
-/*
- * main.c - Xinu Kernel Main Entry Point
- * 
- * This file contains the kernel's main entry point and system initialization
- * sequence. It orchestrates the boot process and creates the initial
- * system processes.
- */
+/* main.c - Kernel main entry point */
 
 #include "../include/kernel.h"
 #include "../include/process.h"
@@ -15,9 +9,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-/*------------------------------------------------------------------------
- * External Declarations
- *------------------------------------------------------------------------*/
 
 extern proc_t proctab[];
 extern pid32 currpid;
@@ -233,74 +224,30 @@ static void idle_process(void) {
     }
 }
 
-/**
- * init_process - Init process (PID 1)
- * 
- * The first user-mode process. Responsible for:
- * - Running startup scripts
- * - Starting system services
- * - Adopting orphaned processes
- * - Handling shutdown
- */
+/* Init process (PID 1) */
 static void init_process(void) {
-    /*
-     * In a full implementation:
-     * 1. Mount filesystems from /etc/fstab
-     * 2. Run /etc/rc scripts
-     * 3. Start system services (network, logging, etc.)
-     * 4. Start login process or shell
-     */
-    
-    /* For now, just run a simple loop */
     while (1) {
-        /* 
-         * Check for orphaned children
-         * Handle signals
-         * Sleep and repeat
-         */
         sleep(1000);
     }
 }
 
-/**
- * shell_process - Shell process
- * 
- * Interactive command shell for user interaction.
- */
+/* Shell process */
 static void shell_process(void) {
-    /*
-     * In full implementation:
-     * extern void shell_start(void);
-     * shell_start();
-     */
-    
     while (1) {
         sleep(1000);
     }
 }
 
-/**
- * create_system_processes - Create initial system processes
- * 
- * Creates the essential system processes after kernel initialization.
- */
+/* Create initial system processes */
 static void create_system_processes(void) {
     pid32 init_pid;
     pid32 shell_pid;
     
-    /*
-     * Create init process (PID 1)
-     * Init is the parent of all user processes
-     */
     init_pid = create((void *)init_process, 4096, 80, "init", 0);
     if (init_pid != SYSERR) {
         resume(init_pid);
     }
     
-    /*
-     * Create shell process
-     * Provides interactive interface
-     */
     shell_pid = create((void *)shell_process, 8192, 50, "shell", 0);
     if (shell_pid != SYSERR) {
         resume(shell_pid);

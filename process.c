@@ -1,10 +1,4 @@
-/*
- * process.c - Xinu Process Management Implementation
- * 
- * This file implements the complete process management subsystem including
- * process creation, termination, state transitions, and inter-process
- * communication primitives.
- */
+/* process.c - Process management implementation */
 
 #include "../include/process.h"
 #include "../include/kernel.h"
@@ -15,28 +9,15 @@
 #include <string.h>
 #include <stdbool.h>
 
-/*------------------------------------------------------------------------
- * External Declarations
- *------------------------------------------------------------------------*/
-
 extern proc_t proctab[];
 extern pid32 currpid;
 extern sem_t semtab[];
 extern void resched(void);
 
-/*------------------------------------------------------------------------
- * Process ID Allocation
- *------------------------------------------------------------------------*/
-
-/* Track which PIDs are in use */
 static bool pid_in_use[NPROC];
-static pid32 next_pid_hint = 1;  /* Start searching from PID 1 */
+static pid32 next_pid_hint = 1;
 
-/**
- * allocate_pid - Allocate a new process ID
- * 
- * Returns: Free process ID, or SYSERR if none available
- */
+/* Allocate a new process ID */
 static pid32 allocate_pid(void) {
     int i;
     pid32 pid;
@@ -56,39 +37,14 @@ static pid32 allocate_pid(void) {
     return SYSERR;
 }
 
-/**
- * release_pid - Release a process ID for reuse
- * 
- * @param pid: Process ID to release
- */
+/* Release a process ID for reuse */
 static void release_pid(pid32 pid) {
     if (pid > 0 && pid < NPROC) {
         pid_in_use[pid] = false;
     }
 }
 
-/*------------------------------------------------------------------------
- * Process Creation
- *------------------------------------------------------------------------*/
-
-/**
- * create - Create a new process
- * 
- * @param funcaddr: Address of function to execute as process entry point
- * @param ssize: Stack size in bytes (minimum 256 bytes)
- * @param priority: Process priority (PRIORITY_MIN to PRIORITY_MAX)
- * @param name: Process name (up to NAMELEN-1 characters)
- * @param nargs: Number of arguments to pass to the function
- * @param ...: Variable arguments to pass to the function
- * 
- * Returns: Process ID on success, SYSERR on failure
- * 
- * The new process is created in SUSPENDED state. Use resume() to start it.
- * 
- * Example:
- *   pid = create(my_func, 4096, 50, "worker", 2, arg1, arg2);
- *   if (pid != SYSERR) resume(pid);
- */
+/* Create a new process (starts in SUSPENDED state) */
 pid32 create(void *funcaddr, uint32_t ssize, uint32_t priority,
              char *name, uint32_t nargs, ...) {
     intmask mask;
@@ -100,13 +56,12 @@ pid32 create(void *funcaddr, uint32_t ssize, uint32_t priority,
     uint32_t i;
     uint32_t *stack_top;
     
-    /* Validate parameters */
     if (funcaddr == NULL) {
         return SYSERR;
     }
     
     if (ssize < 256) {
-        ssize = 256;  /* Minimum stack size */
+        ssize = 256;
     }
     
     if (priority < PRIORITY_MIN) {
@@ -115,12 +70,10 @@ pid32 create(void *funcaddr, uint32_t ssize, uint32_t priority,
         priority = PRIORITY_MAX;
     }
     
-    /* Round stack size to word boundary */
     ssize = (ssize + sizeof(uint32_t) - 1) & ~(sizeof(uint32_t) - 1);
     
     mask = disable();
     
-    /* Allocate process ID */
     pid = allocate_pid();
     if (pid == SYSERR) {
         restore(mask);
@@ -129,7 +82,6 @@ pid32 create(void *funcaddr, uint32_t ssize, uint32_t priority,
     
     pptr = &proctab[pid];
     
-    /* Allocate stack memory */
     saddr = (uint32_t *)getstk(ssize);
     if (saddr == NULL || saddr == (uint32_t *)SYSERR) {
         release_pid(pid);
@@ -137,10 +89,8 @@ pid32 create(void *funcaddr, uint32_t ssize, uint32_t priority,
         return SYSERR;
     }
     
-    /*
-     * Initialize Process Control Block
-     */
-    pptr->pstate = PR_SUSP;     /* Start suspended */
+    /* Initialize PCB */
+    pptr->pstate = PR_SUSP;
     pptr->pprio = priority;
     pptr->pstkbase = (uint32_t)saddr;
     pptr->pstklen = ssize;
@@ -152,7 +102,6 @@ pid32 create(void *funcaddr, uint32_t ssize, uint32_t priority,
     pptr->paddr = (uint32_t)funcaddr;
     pptr->pargs = nargs;
     
-    /* Copy process name */
     if (name != NULL) {
         strncpy(pptr->pname, name, NAMELEN - 1);
         pptr->pname[NAMELEN - 1] = '\0';
@@ -160,39 +109,14 @@ pid32 create(void *funcaddr, uint32_t ssize, uint32_t priority,
         strcpy(pptr->pname, "unknown");
     }
     
-    /* Clear register save area */
     memset(pptr->pregs, 0, sizeof(pptr->pregs));
     
-    /*
-     * Build Initial Stack Frame
-     * 
-     * Stack layout (growing downward):
-     * 
-     *   High address (stack base)
-     *   +------------------+
-     *   | Argument N-1     |  <- Arguments to function
-     *   | ...              |
-     *   | Argument 0       |
-     *   +------------------+
-     *   | Return address   |  <- userret (process exit handler)
-     *   +------------------+
-     *   | Saved FP         |  <- Frame pointer (0 for initial)
-     *   +------------------+
-     *   | Saved registers  |  <- R0-R12 or general purpose regs
-     *   +------------------+
-     *   | PC (entry point) |  <- Function address
-     *   +------------------+
-     *   Low address (stack pointer)
-     */
-    
-    /* Start at top of stack */
+    /* Build initial stack frame */
     stack_top = saddr + (ssize / sizeof(uint32_t));
     saddr = stack_top;
     
-    /* Push arguments in reverse order */
     va_start(ap, nargs);
     
-    /* Allocate space for arguments on stack */
     if (nargs > 0) {
         saddr -= nargs;
         savargs = saddr;

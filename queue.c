@@ -1,9 +1,4 @@
-/*
- * queue.c - Xinu Queue Management Implementation
- * 
- * This file implements queue data structures used throughout the kernel
- * for managing lists of processes (ready queue, wait queues, etc.).
- */
+/* queue.c - Queue management implementation */
 
 #include "../include/kernel.h"
 #include "../include/process.h"
@@ -12,11 +7,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-/*------------------------------------------------------------------------
- * Queue Constants
- *------------------------------------------------------------------------*/
-
-#define NQENT       (NPROC + NSEM + 4)  /* Number of queue entries */
+#define NQENT       (NPROC + NSEM + 4)
 #define EMPTY       -1                   /* Empty queue marker */
 
 /* Queue entry states */
