@@ -11,105 +11,83 @@
 
 #define SYS_CREATE      1
 #define SYS_KILL        2 
-#define SYS_GETPID      3       /* Get current PID */
-#define SYS_SUSPEND     4       /* Suspend process */
-#define SYS_RESUME      5       /* Resume process */
-#define SYS_YIELD       6       /* Yield CPU */
-#define SYS_SLEEP       7       /* Sleep for ticks */
-#define SYS_SLEEPMS     8       /* Sleep for milliseconds */
-#define SYS_EXIT        9       /* Exit current process */
-#define SYS_WAIT        10      /* Wait for child */
-#define SYS_GETPRIO     11      /* Get priority */
+#define SYS_GETPID      3
+#define SYS_SUSPEND     4
+#define SYS_RESUME      5
+#define SYS_YIELD       6
+#define SYS_SLEEP       7       
+#define SYS_SLEEPMS     8       
+#define SYS_EXIT        9       
+#define SYS_WAIT        10 
+#define SYS_GETPRIO     11 
 #define SYS_SETPRIO     12
 
 /* Memory system calls */
-#define SYS_GETMEM      20      /* Allocate memory */
-#define SYS_FREEMEM     21      /* Free memory */
-#define SYS_GETSTK      22      /* Allocate stack */
-#define SYS_FREESTK     23      /* Free stack */
+#define SYS_GETMEM      20
+#define SYS_FREEMEM     21
+#define SYS_GETSTK      22
+#define SYS_FREESTK     23
 
 /* Semaphore system calls */
-#define SYS_SEMCREATE   30      /* Create semaphore */
-#define SYS_SEMDELETE   31      /* Delete semaphore */
-#define SYS_WAIT_SEM    32      /* Wait on semaphore */
-#define SYS_SIGNAL      33      /* Signal semaphore */
-#define SYS_SIGNALN     34      /* Signal N times */
-#define SYS_SEMCOUNT    35      /* Get semaphore count */
+#define SYS_SEMCREATE   30
+#define SYS_SEMDELETE   31
+#define SYS_WAIT_SEM    32
+#define SYS_SIGNAL      33
+#define SYS_SIGNALN     34
+#define SYS_SEMCOUNT    35
 
 /* I/O system calls */
-#define SYS_READ        40      /* Read from device */
-#define SYS_WRITE       41      /* Write to device */
-#define SYS_OPEN        42      /* Open device */
-#define SYS_CLOSE       43      /* Close device */
-#define SYS_SEEK        44      /* Seek on device */
-#define SYS_IOCTL       45      /* Device control */
-#define SYS_GETC        46      /* Get character */
-#define SYS_PUTC        47      /* Put character */
-
+#define SYS_READ        40
+#define SYS_WRITE       41
+#define SYS_OPEN        42
+#define SYS_CLOSE       43
+#define SYS_SEEK        44
+#define SYS_IOCTL       45
+#define SYS_GETC        46
+#define SYS_PUTC        47
 /* Message passing system calls */
-#define SYS_SEND        50      /* Send message */
-#define SYS_RECEIVE     51      /* Receive message */
-#define SYS_RECVCLR     52      /* Receive and clear */
-#define SYS_RECVTIME    53      /* Receive with timeout */
+#define SYS_SEND        50
+#define SYS_RECEIVE     51      
+#define SYS_RECVCLR     52      
+#define SYS_RECVTIME    53 
 
 /* Time system calls */
-#define SYS_GETTIME     60      /* Get system time */
-#define SYS_GETTICKS    61      /* Get tick count */
-#define SYS_GETUPTIME   62      /* Get uptime */
+#define SYS_GETTIME     60 
+#define SYS_GETTICKS    61
+#define SYS_GETUPTIME   62
 
 /* System control */
-#define SYS_SHUTDOWN    70      /* Shutdown system */
-#define SYS_REBOOT      71      /* Reboot system */
+#define SYS_SHUTDOWN    70 
+#define SYS_REBOOT      71
 
 /* Maximum system call number */
 #define NSYSCALLS       128
 
-/*------------------------------------------------------------------------
- * System Call Table
- *------------------------------------------------------------------------*/
-
-/* System call handler function type */
 typedef int32_t (*syscall_handler_t)(void *args);
 
-/* System call table entry */
 typedef struct {
-    syscall_handler_t   handler;    /* Handler function */
-    const char          *name;      /* System call name */
-    uint8_t             nargs;      /* Number of arguments */
-    bool                enabled;    /* Is syscall enabled */
+    syscall_handler_t   handler; 
+    const char          *name;
+    uint8_t             nargs;
+    bool                enabled;
 } syscall_entry_t;
 
-/* System call table */
 static syscall_entry_t syscall_table[NSYSCALLS];
 
-/* System call statistics */
 static struct {
-    uint64_t total_calls;           /* Total system calls */
-    uint64_t calls[NSYSCALLS];      /* Per-syscall counts */
-    uint64_t errors;                /* Error count */
+    uint64_t total_calls;
+    uint64_t calls[NSYSCALLS];
+    uint64_t errors;
 } syscall_stats;
 
-/*------------------------------------------------------------------------
- * System Call Argument Access
- *------------------------------------------------------------------------*/
+/*  System Call Argument Access */
 
-/**
- * System call argument structure
- * 
- * Architecture-dependent: arguments may be passed in registers
- * or on the stack. This structure provides a uniform interface.
- */
 typedef struct {
     uint32_t arg[8];    /* Up to 8 arguments */
 } syscall_args_t;
 
-/*------------------------------------------------------------------------
- * System Call Handlers (Process)
- *------------------------------------------------------------------------*/
+/*  System Call Handlers (Process) */
 
-/**
- * sys_create - System call handler for create
- */
 static int32_t sys_create(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     void *funcaddr = (void *)a->arg[0];
@@ -122,9 +100,6 @@ static int32_t sys_create(void *args) {
     return create(funcaddr, ssize, priority, name, nargs);
 }
 
-/**
- * sys_kill - System call handler for kill
- */
 static int32_t sys_kill(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     pid32 pid = (pid32)a->arg[0];
@@ -132,17 +107,11 @@ static int32_t sys_kill(void *args) {
     return kill(pid);
 }
 
-/**
- * sys_getpid - System call handler for getpid
- */
 static int32_t sys_getpid(void *args) {
     (void)args;
     return getpid();
 }
 
-/**
- * sys_suspend - System call handler for suspend
- */
 static int32_t sys_suspend(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     pid32 pid = (pid32)a->arg[0];
@@ -150,9 +119,6 @@ static int32_t sys_suspend(void *args) {
     return suspend(pid);
 }
 
-/**
- * sys_resume - System call handler for resume
- */
 static int32_t sys_resume(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     pid32 pid = (pid32)a->arg[0];
@@ -160,18 +126,12 @@ static int32_t sys_resume(void *args) {
     return resume(pid);
 }
 
-/**
- * sys_yield - System call handler for yield
- */
 static int32_t sys_yield(void *args) {
     (void)args;
     yield();
     return OK;
 }
 
-/**
- * sys_sleep - System call handler for sleep
- */
 static int32_t sys_sleep(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     uint32_t delay = a->arg[0];
@@ -179,9 +139,6 @@ static int32_t sys_sleep(void *args) {
     return sleep(delay);
 }
 
-/**
- * sys_sleepms - System call handler for sleepms
- */
 static int32_t sys_sleepms(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     uint32_t msec = a->arg[0];
@@ -189,9 +146,6 @@ static int32_t sys_sleepms(void *args) {
     return sleepms(msec);
 }
 
-/**
- * sys_exit - System call handler for exit
- */
 static int32_t sys_exit(void *args) {
     (void)args;
     /* Kill the current process */
@@ -200,9 +154,6 @@ static int32_t sys_exit(void *args) {
     return OK;
 }
 
-/**
- * sys_getprio - System call handler for getprio
- */
 static int32_t sys_getprio(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     pid32 pid = (pid32)a->arg[0];
@@ -210,9 +161,6 @@ static int32_t sys_getprio(void *args) {
     return getprio(pid);
 }
 
-/**
- * sys_setprio - System call handler for chprio
- */
 static int32_t sys_setprio(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     pid32 pid = (pid32)a->arg[0];
@@ -221,13 +169,8 @@ static int32_t sys_setprio(void *args) {
     return chprio(pid, newprio);
 }
 
-/*------------------------------------------------------------------------
- * System Call Handlers (Memory)
- *------------------------------------------------------------------------*/
+/*  System Call Handlers (Memory) */
 
-/**
- * sys_getmem - System call handler for getmem
- */
 static int32_t sys_getmem(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     uint32_t nbytes = a->arg[0];
@@ -235,9 +178,6 @@ static int32_t sys_getmem(void *args) {
     return (int32_t)getmem(nbytes);
 }
 
-/**
- * sys_freemem - System call handler for freemem
- */
 static int32_t sys_freemem(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     void *block = (void *)a->arg[0];
@@ -246,13 +186,8 @@ static int32_t sys_freemem(void *args) {
     return freemem(block, nbytes);
 }
 
-/*------------------------------------------------------------------------
- * System Call Handlers (Semaphore)
- *------------------------------------------------------------------------*/
+/*  System Call Handlers (Semaphore) */
 
-/**
- * sys_semcreate - System call handler for semcreate
- */
 static int32_t sys_semcreate(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     int32_t count = (int32_t)a->arg[0];
@@ -260,9 +195,6 @@ static int32_t sys_semcreate(void *args) {
     return semcreate(count);
 }
 
-/**
- * sys_semdelete - System call handler for semdelete
- */
 static int32_t sys_semdelete(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     sid32 sem = (sid32)a->arg[0];
@@ -270,9 +202,6 @@ static int32_t sys_semdelete(void *args) {
     return semdelete(sem);
 }
 
-/**
- * sys_wait_sem - System call handler for wait (semaphore)
- */
 static int32_t sys_wait_sem(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     sid32 sem = (sid32)a->arg[0];
@@ -280,9 +209,6 @@ static int32_t sys_wait_sem(void *args) {
     return wait(sem);
 }
 
-/**
- * sys_signal - System call handler for signal
- */
 static int32_t sys_signal(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     sid32 sem = (sid32)a->arg[0];
@@ -290,9 +216,6 @@ static int32_t sys_signal(void *args) {
     return signal(sem);
 }
 
-/**
- * sys_signaln - System call handler for signaln
- */
 static int32_t sys_signaln(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     sid32 sem = (sid32)a->arg[0];
@@ -301,9 +224,6 @@ static int32_t sys_signaln(void *args) {
     return signaln(sem, count);
 }
 
-/**
- * sys_semcount - System call handler for semcount
- */
 static int32_t sys_semcount(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     sid32 sem = (sid32)a->arg[0];
@@ -311,13 +231,8 @@ static int32_t sys_semcount(void *args) {
     return semcount(sem);
 }
 
-/*------------------------------------------------------------------------
- * System Call Handlers (Message Passing)
- *------------------------------------------------------------------------*/
+/* System Call Handlers (Message Passing) */
 
-/**
- * sys_send - System call handler for send
- */
 static int32_t sys_send(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     pid32 pid = (pid32)a->arg[0];
@@ -326,25 +241,16 @@ static int32_t sys_send(void *args) {
     return send(pid, msg);
 }
 
-/**
- * sys_receive - System call handler for receive
- */
 static int32_t sys_receive(void *args) {
     (void)args;
     return receive();
 }
 
-/**
- * sys_recvclr - System call handler for recvclr
- */
 static int32_t sys_recvclr(void *args) {
     (void)args;
     return recvclr();
 }
 
-/**
- * sys_recvtime - System call handler for recvtime
- */
 static int32_t sys_recvtime(void *args) {
     syscall_args_t *a = (syscall_args_t *)args;
     uint32_t timeout = a->arg[0];
@@ -352,33 +258,18 @@ static int32_t sys_recvtime(void *args) {
     return recvtime(timeout);
 }
 
-/*------------------------------------------------------------------------
- * System Call Handlers (Time)
- *------------------------------------------------------------------------*/
+/* System Call Handlers (Time) */
 
-/**
- * sys_gettime - System call handler for gettime
- */
 static int32_t sys_gettime(void *args) {
     (void)args;
     return gettime();
 }
 
-/**
- * sys_getticks - System call handler for getticks
- */
 static int32_t sys_getticks(void *args) {
     (void)args;
     return (int32_t)(getticks() & 0xFFFFFFFF);
 }
 
-/*------------------------------------------------------------------------
- * System Call Handlers (System Control)
- *------------------------------------------------------------------------*/
-
-/**
- * sys_shutdown - System call handler for shutdown
- */
 static int32_t sys_shutdown(void *args) {
     (void)args;
     shutdown();
