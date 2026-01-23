@@ -1,9 +1,4 @@
-/*
- * syscall.c - Xinu System Call Implementation
- * 
- * This file implements the system call interface and dispatching
- * mechanism for the Xinu operating system.
- */
+/* syscall.c - System call implementation */
 
 #include "../include/kernel.h"
 #include "../include/process.h"
@@ -14,13 +9,8 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-/*------------------------------------------------------------------------
- * System Call Numbers
- *------------------------------------------------------------------------*/
-
-/* Process system calls */
-#define SYS_CREATE      1       /* Create process */
-#define SYS_KILL        2       /* Kill process */
+#define SYS_CREATE      1
+#define SYS_KILL        2 
 #define SYS_GETPID      3       /* Get current PID */
 #define SYS_SUSPEND     4       /* Suspend process */
 #define SYS_RESUME      5       /* Resume process */
@@ -30,7 +20,7 @@
 #define SYS_EXIT        9       /* Exit current process */
 #define SYS_WAIT        10      /* Wait for child */
 #define SYS_GETPRIO     11      /* Get priority */
-#define SYS_SETPRIO     12      /* Set priority */
+#define SYS_SETPRIO     12
 
 /* Memory system calls */
 #define SYS_GETMEM      20      /* Allocate memory */
@@ -612,13 +602,10 @@ int64_t syscall_count(int num) {
     return syscall_stats.calls[num];
 }
 
-/**
- * syscall_stats_print - Print system call statistics
- */
 void syscall_stats_print(void) {
     int i;
     
-    kprintf("\n===== System Call Statistics =====\n");
+    kprintf("\n System Call Statistics \n");
     kprintf("Total calls: %llu\n", syscall_stats.total_calls);
     kprintf("Total errors: %llu\n\n", syscall_stats.errors);
     
@@ -629,36 +616,22 @@ void syscall_stats_print(void) {
                     i, syscall_table[i].name, syscall_stats.calls[i]);
         }
     }
-    kprintf("==================================\n\n");
 }
 
-/**
- * syscall_list - List all registered system calls
- */
 void syscall_list(void) {
     int i;
     
-    kprintf("\n===== Registered System Calls =====\n");
+    kprintf("\n Registered System Calls \n");
     for (i = 0; i < NSYSCALLS; i++) {
         if (syscall_table[i].enabled) {
             kprintf("  [%3d] %-12s (%d args)\n",
                     i, syscall_table[i].name, syscall_table[i].nargs);
         }
     }
-    kprintf("===================================\n\n");
 }
-
-/*------------------------------------------------------------------------
- * User-Space System Call Wrappers
- *------------------------------------------------------------------------*/
-
-/* These would typically be in a separate user-space library */
 
 #ifdef USER_SPACE_SYSCALLS
 
-/**
- * _syscall0 - System call with 0 arguments
- */
 static inline int32_t _syscall0(int num) {
     /* Architecture-specific inline assembly */
     int32_t result;
@@ -680,9 +653,6 @@ static inline int32_t _syscall0(int num) {
     return result;
 }
 
-/**
- * _syscall1 - System call with 1 argument
- */
 static inline int32_t _syscall1(int num, uint32_t arg1) {
     int32_t result;
     
@@ -703,9 +673,7 @@ static inline int32_t _syscall1(int num, uint32_t arg1) {
     return result;
 }
 
-/**
- * _syscall2 - System call with 2 arguments
- */
+
 static inline int32_t _syscall2(int num, uint32_t arg1, uint32_t arg2) {
     int32_t result;
     
@@ -726,9 +694,6 @@ static inline int32_t _syscall2(int num, uint32_t arg1, uint32_t arg2) {
     return result;
 }
 
-/**
- * _syscall3 - System call with 3 arguments
- */
 static inline int32_t _syscall3(int num, uint32_t arg1, uint32_t arg2, uint32_t arg3) {
     int32_t result;
     
@@ -749,4 +714,4 @@ static inline int32_t _syscall3(int num, uint32_t arg1, uint32_t arg2, uint32_t 
     return result;
 }
 
-#endif /* USER_SPACE_SYSCALLS */
+#endif 
