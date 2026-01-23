@@ -385,22 +385,14 @@ static int32_t sys_shutdown(void *args) {
     return OK;
 }
 
-/**
- * sys_reboot - System call handler for reboot
- */
 static int32_t sys_reboot(void *args) {
     (void)args;
     reboot();
     return OK;
 }
 
-/*------------------------------------------------------------------------
- * System Call Initialization
- *------------------------------------------------------------------------*/
+/* System Call Initialization */
 
-/**
- * syscall_init - Initialize the system call subsystem
- */
 void syscall_init(void) {
     int i;
     
@@ -459,16 +451,6 @@ void syscall_init(void) {
     syscall_register(SYS_REBOOT, sys_reboot, "reboot", 0);
 }
 
-/**
- * syscall_register - Register a system call handler
- * 
- * @param num: System call number
- * @param handler: Handler function
- * @param name: System call name
- * @param nargs: Number of arguments
- * 
- * Returns: OK on success, SYSERR on error
- */
 syscall syscall_register(int num, syscall_handler_t handler,
                          const char *name, uint8_t nargs) {
     if (num < 0 || num >= NSYSCALLS) {
@@ -487,13 +469,6 @@ syscall syscall_register(int num, syscall_handler_t handler,
     return OK;
 }
 
-/**
- * syscall_unregister - Unregister a system call
- * 
- * @param num: System call number
- * 
- * Returns: OK on success, SYSERR on error
- */
 syscall syscall_unregister(int num) {
     if (num < 0 || num >= NSYSCALLS) {
         return SYSERR;
@@ -507,53 +482,29 @@ syscall syscall_unregister(int num) {
     return OK;
 }
 
-/*------------------------------------------------------------------------
- * System Call Dispatch
- *------------------------------------------------------------------------*/
+/* System Call Dispatch */
 
-/**
- * syscall_dispatch - Dispatch a system call
- * 
- * @param num: System call number
- * @param args: Pointer to arguments
- * 
- * Returns: System call result
- * 
- * This is called from the system call interrupt handler after
- * extracting the syscall number and arguments.
- */
 int32_t syscall_dispatch(int num, void *args) {
     int32_t result;
-    
-    /* Validate syscall number */
+
     if (num < 0 || num >= NSYSCALLS) {
         syscall_stats.errors++;
         return SYSERR;
     }
-    
-    /* Check if syscall is registered and enabled */
+
     if (!syscall_table[num].enabled || syscall_table[num].handler == NULL) {
         syscall_stats.errors++;
         return SYSERR;
     }
-    
-    /* Update statistics */
+
     syscall_stats.total_calls++;
     syscall_stats.calls[num]++;
     
-    /* Call the handler */
     result = syscall_table[num].handler(args);
     
     return result;
 }
 
-/**
- * syscall_handler - Low-level system call entry point
- * 
- * This is called from the interrupt/trap handler.
- * Architecture-specific code extracts syscall number and arguments
- * and calls this function.
- */
 void syscall_handler(void) {
     /* Architecture-specific:
      * 
@@ -568,17 +519,6 @@ void syscall_handler(void) {
     /* Placeholder - actual implementation is architecture-specific */
 }
 
-/*------------------------------------------------------------------------
- * System Call Information
- *------------------------------------------------------------------------*/
-
-/**
- * syscall_name - Get name of a system call
- * 
- * @param num: System call number
- * 
- * Returns: System call name, or NULL if invalid
- */
 const char *syscall_name(int num) {
     if (num < 0 || num >= NSYSCALLS) {
         return NULL;
@@ -587,13 +527,7 @@ const char *syscall_name(int num) {
     return syscall_table[num].name;
 }
 
-/**
- * syscall_count - Get number of times a syscall was invoked
- * 
- * @param num: System call number
- * 
- * Returns: Call count, or -1 if invalid
- */
+
 int64_t syscall_count(int num) {
     if (num < 0 || num >= NSYSCALLS) {
         return -1;
