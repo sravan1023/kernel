@@ -406,8 +406,6 @@ void syscall_handler(void) {
      * Implementation would extract these into syscall_args_t
      * and call syscall_dispatch().
      */
-    
-    /* Placeholder - actual implementation is architecture-specific */
 }
 
 const char *syscall_name(int num) {
