@@ -97,11 +97,15 @@ static void create_system_processes(void) {
     init_pid = create((void *)init_process, 4096, 80, "init", 0);
     if (init_pid != SYSERR) {
         resume(init_pid);
+    } else {
+        kprintf("ERROR: Failed to create init process\n");
     }
     
     shell_pid = create((void *)shell_process, 8192, 50, "shell", 0);
     if (shell_pid != SYSERR) {
         resume(shell_pid);
+    } else {
+        kprintf("ERROR: Failed to create shell process\n");
     }
 }
 
