@@ -85,7 +85,7 @@ static void init_process(void) {
 
 static void shell_process(void) {
     while (1) {
-        sleep(1000);
+        sleep(500);
     }
 }
 
