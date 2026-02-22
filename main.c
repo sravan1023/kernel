@@ -253,13 +253,6 @@ static void create_system_processes(void) {
         resume(shell_pid);
     }
     
-    /*
-     * Additional system processes could be created here:
-     * - Network daemon
-     * - Log daemon
-     * - Cron/scheduler daemon
-     * - Device manager
-     */
 }
 
 /*------------------------------------------------------------------------
@@ -405,9 +398,7 @@ void nulluser(void) {
     kernel_main();
 }
 
-/*------------------------------------------------------------------------
- * System Shutdown
- *------------------------------------------------------------------------*/
+/* System Shutdown */
 
 /**
  * shutdown - Perform system shutdown
